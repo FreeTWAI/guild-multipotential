@@ -5,7 +5,16 @@ import {execFileSync} from 'node:child_process';
 
 const actions = ['skills', 'tools', 'work', 'information'];
 const text = (value, maximum) => typeof value === 'string' && value.trim().length > 0 && value.length <= maximum && !/[\u0000-\u001f\u007f]/.test(value);
-const exact = (value, keys) => value && typeof value === 'object' && !Array.isArray(value) && Object.keys(value).length === keys.length && keys.every(key => Object.hasOwn(value, key));
+const exact = (value, keys) => {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  let count = 0;
+  for (const key in value) count++;
+  if (count !== keys.length) return false;
+  for (let i = 0; i < keys.length; i++) {
+    if (!(keys[i] in value)) return false;
+  }
+  return true;
+};
 export function validateWorkspace(value) {
   if (!exact(value, ['schema_version', 'guild_key', 'name', 'repository', 'headline', 'purpose', 'outcome', 'steps'])
     || value.schema_version !== 'freedom.guild-workspace/v1'
@@ -18,7 +27,23 @@ export function validateWorkspace(value) {
   }
   return value;
 }
-export const escapeHtml = value => String(value).replace(/[&<>"']/g, char => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[char]));
+export const escapeHtml = value => {
+  const str = String(value);
+  const match = /[&<>"']/.exec(str);
+  if (!match) return str;
+  let res = '';
+  let lastIndex = 0;
+  for (let i = match.index; i < str.length; i++) {
+    switch (str.charCodeAt(i)) {
+      case 38: res += str.substring(lastIndex, i) + '&amp;'; lastIndex = i + 1; break;
+      case 60: res += str.substring(lastIndex, i) + '&lt;'; lastIndex = i + 1; break;
+      case 62: res += str.substring(lastIndex, i) + '&gt;'; lastIndex = i + 1; break;
+      case 34: res += str.substring(lastIndex, i) + '&quot;'; lastIndex = i + 1; break;
+      case 39: res += str.substring(lastIndex, i) + '&#39;'; lastIndex = i + 1; break;
+    }
+  }
+  return res + str.substring(lastIndex);
+};
 const href = (workspace, action) => `https://freetwai.com/#guilds/${workspace.guild_key}/${action}`;
 export function renderWorkspace(workspace) {
   validateWorkspace(workspace);
